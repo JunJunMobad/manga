@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = False
+        extra = "ignore"
     
     def get_firebase_credentials(self) -> Dict[str, Any]:
         """Parse Firebase service account key from JSON string"""
