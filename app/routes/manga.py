@@ -26,23 +26,29 @@ async def subscribe_to_manga(
         user_id: Firebase user ID from authentication
         
     Returns:
-        Success response with updated subscriptions
+        Success response with updated subscriptions or error if already subscribed
     """
     firestore_service = FirestoreService()
     
-    success = await firestore_service.subscribe_to_manga(user_id, request.manga_id)
+    result = await firestore_service.subscribe_to_manga(user_id, request.manga_id)
     
-    if not success:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to subscribe to manga"
-        )
+    if not result['success']:
+        if "already subscribed" in result['message']:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=result['message']
+            )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=result['message']
+            )
     
     subscriptions = await firestore_service.get_user_subscriptions(user_id)
     
     return MangaSubscriptionResponse(
         success=True,
-        message=f"Successfully subscribed to manga: {request.manga_id}",
+        message=result['message'],
         manga_id=request.manga_id,
         subscriptions=subscriptions
     )

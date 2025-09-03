@@ -72,7 +72,7 @@ class FirestoreService:
     def __init__(self):
         self.db = get_firestore_client()
     
-    async def save_fcm_token(self, user_id: str, fcm_token: str) -> bool:
+    async def save_fcm_token(self, user_id: str, fcm_token: str) -> dict:
         """
         Save or update FCM token for user (adds to existing tokens, removes duplicates)
         
@@ -81,10 +81,22 @@ class FirestoreService:
             fcm_token: FCM registration token
             
         Returns:
-            True if successful
+            Dict with 'success' boolean and 'message' string
         """
         try:
             doc_ref = self.db.collection('fcm_tokens').document(user_id)
+            doc = doc_ref.get()
+            
+            if doc.exists:
+                data = doc.to_dict()
+                current_tokens = data.get('tokens', [])
+                
+                if fcm_token in current_tokens:
+                    print(f"⚠️ FCM token already exists for user {user_id}")
+                    return {
+                        'success': False,
+                        'message': 'This token is already stored'
+                    }
             
             doc_ref.set({
                 'tokens': firestore.ArrayUnion([fcm_token]),
@@ -92,10 +104,17 @@ class FirestoreService:
             }, merge=True)
             
             print(f"✅ FCM token saved for user {user_id}")
-            return True
+            return {
+                'success': True,
+                'message': 'FCM token saved successfully'
+            }
+            
         except Exception as e:
             print(f"❌ Error saving FCM token: {e}")
-            return False
+            return {
+                'success': False,
+                'message': f'Error saving FCM token: {str(e)}'
+            }
     
     async def get_fcm_tokens(self, user_id: str) -> list:
         """Get FCM tokens for user"""
@@ -160,7 +179,7 @@ class FirestoreService:
                 'message': f'Error removing FCM token: {str(e)}'
             }
     
-    async def subscribe_to_manga(self, user_id: str, manga_id: str) -> bool:
+    async def subscribe_to_manga(self, user_id: str, manga_id: str) -> dict:
         """
         Subscribe user to manga notifications
         
@@ -169,18 +188,40 @@ class FirestoreService:
             manga_id: Manga identifier
             
         Returns:
-            True if successful
+            Dict with 'success' boolean and 'message' string
         """
         try:
             doc_ref = self.db.collection('subscriptions').document(user_id)
+            doc = doc_ref.get()
+            
+            if doc.exists:
+                data = doc.to_dict()
+                current_mangas = data.get('mangas', [])
+                
+                if manga_id in current_mangas:
+                    print(f"⚠️ User {user_id} already subscribed to manga {manga_id}")
+                    return {
+                        'success': False,
+                        'message': 'You already subscribed to this manga'
+                    }
+            
             doc_ref.set({
                 'mangas': firestore.ArrayUnion([manga_id]),
                 'updated_at': firestore.SERVER_TIMESTAMP
             }, merge=True)
-            return True
+            
+            print(f"✅ User {user_id} subscribed to manga {manga_id}")
+            return {
+                'success': True,
+                'message': f'Successfully subscribed to manga: {manga_id}'
+            }
+            
         except Exception as e:
-            print(f"Error subscribing to manga: {e}")
-            return False
+            print(f"❌ Error subscribing to manga: {e}")
+            return {
+                'success': False,
+                'message': f'Error subscribing to manga: {str(e)}'
+            }
     
     async def unsubscribe_from_manga(self, user_id: str, manga_id: str) -> dict:
         """

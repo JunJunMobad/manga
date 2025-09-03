@@ -27,21 +27,27 @@ async def save_fcm_token(
         user_id: Firebase user ID from authentication
         
     Returns:
-        Success response
+        Success response or error if token already exists
     """
     firestore_service = FirestoreService()
     
-    success = await firestore_service.save_fcm_token(user_id, request.fcm_token)
+    result = await firestore_service.save_fcm_token(user_id, request.fcm_token)
     
-    if not success:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to save FCM token"
-        )
+    if not result['success']:
+        if "already stored" in result['message']:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=result['message']
+            )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=result['message']
+            )
     
     return FCMTokenResponse(
         success=True,
-        message="FCM token saved successfully"
+        message=result['message']
     )
 
 
