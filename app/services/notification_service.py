@@ -14,6 +14,9 @@ class NotificationService:
     def __init__(self):
         self.fcm_url = "https://fcm.googleapis.com/fcm/send"
         self.firestore_service = FirestoreService()
+        
+        if not settings.fcm_server_key:
+            print("⚠️  FCM_SERVER_KEY not configured. Notification sending will be disabled.")
     
     async def send_notification_to_tokens(
         self, 
@@ -34,6 +37,12 @@ class NotificationService:
         Returns:
             Response from FCM service
         """
+        if not settings.fcm_server_key:
+            return {
+                "error": "FCM_SERVER_KEY not configured",
+                "message": "Notification sending is disabled. Please configure FCM_SERVER_KEY environment variable."
+            }
+        
         headers = {
             "Authorization": f"key={settings.fcm_server_key}",
             "Content-Type": "application/json"
