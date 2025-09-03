@@ -1,7 +1,7 @@
 """
 Notification-related API endpoints
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from typing import Dict, Any
 
 from app.schemas.requests import FCMTokenRequest, NotificationRequest, TestNotificationRequest
@@ -118,14 +118,14 @@ async def send_test_notification(
 
 @router.delete("/token", response_model=FCMTokenResponse)
 async def remove_fcm_token(
-    request: FCMTokenRequest,
+    fcm_token: str = Query(..., description="FCM registration token to remove"),
     user_id: str = Depends(get_user_id)
 ):
     """
     Remove FCM token for authenticated user
     
     Args:
-        request: FCM token request containing the registration token to remove
+        fcm_token: FCM registration token to remove (query parameter)
         user_id: Firebase user ID from authentication
         
     Returns:
@@ -133,7 +133,7 @@ async def remove_fcm_token(
     """
     firestore_service = FirestoreService()
     
-    result = await firestore_service.remove_fcm_token(user_id, request.fcm_token)
+    result = await firestore_service.remove_fcm_token(user_id, fcm_token)
     
     if not result['success']:
         if "does not exist" in result['message'] or "No FCM tokens found" in result['message']:
