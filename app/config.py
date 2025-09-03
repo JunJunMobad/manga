@@ -11,7 +11,8 @@ class Settings(BaseSettings):
     
     firebase_service_account_key: str
     
-    fcm_server_key: str
+    # FCM Server Key for sending notifications (optional for basic functionality)
+    fcm_server_key: str = ""
     
     environment: str = "development"
     debug: bool = True
