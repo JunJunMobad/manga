@@ -27,11 +27,8 @@ async def get_current_user(
         HTTPException: 401 if token is invalid
     """
     try:
-        # Extract token from Bearer authorization
-        print(credentials)
         id_token = credentials.credentials
         
-        # Verify token with Firebase
         decoded_token = await verify_firebase_token(id_token)
         
         return decoded_token
