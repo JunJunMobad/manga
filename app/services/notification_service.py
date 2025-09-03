@@ -1,9 +1,9 @@
 """
-FCM notification service for sending push notifications
+FCM notification service for sending push notifications using Firebase Admin SDK
 """
-import requests
 import json
 from typing import List, Dict, Any
+from firebase_admin import messaging
 from app.config import settings
 from app.services.firebase_service import FirestoreService
 
@@ -12,11 +12,8 @@ class NotificationService:
     """Service for sending FCM notifications"""
     
     def __init__(self):
-        self.fcm_url = "https://fcm.googleapis.com/fcm/send"
         self.firestore_service = FirestoreService()
-        
-        if not settings.fcm_server_key:
-            print("⚠️  FCM_SERVER_KEY not configured. Notification sending will be disabled.")
+        print("✅ FCM notification service initialized with Firebase Admin SDK")
     
     async def send_notification_to_tokens(
         self, 
@@ -26,7 +23,7 @@ class NotificationService:
         data: Dict[str, Any] = None
     ) -> Dict[str, Any]:
         """
-        Send notification to specific FCM tokens
+        Send notification to specific FCM tokens using Firebase Admin SDK
         
         Args:
             tokens: List of FCM registration tokens
@@ -37,39 +34,66 @@ class NotificationService:
         Returns:
             Response from FCM service
         """
-        if not settings.fcm_server_key:
-            return {
-                "error": "FCM_SERVER_KEY not configured",
-                "message": "Notification sending is disabled. Please configure FCM_SERVER_KEY environment variable."
-            }
-        
-        headers = {
-            "Authorization": f"key={settings.fcm_server_key}",
-            "Content-Type": "application/json"
-        }
-        
-        payload = {
-            "registration_ids": tokens,
-            "notification": {
-                "title": title,
-                "body": body,
-                "sound": "default"
-            }
-        }
-        
-        if data:
-            payload["data"] = data
-        
         try:
-            response = requests.post(
-                self.fcm_url,
-                headers=headers,
-                data=json.dumps(payload)
+            notification = messaging.Notification(
+                title=title,
+                body=body
             )
-            return response.json()
+            
+            android_config = messaging.AndroidConfig(
+                notification=messaging.AndroidNotification(
+                    sound="default"
+                )
+            )
+            
+            apns_config = messaging.APNSConfig(
+                payload=messaging.APNSPayload(
+                    aps=messaging.Aps(sound="default")
+                )
+            )
+            
+            string_data = {}
+            if data:
+                string_data = {k: str(v) for k, v in data.items()}
+            
+            message = messaging.MulticastMessage(
+                notification=notification,
+                data=string_data,
+                tokens=tokens,
+                android=android_config,
+                apns=apns_config
+            )
+            
+            response = messaging.send_multicast(message)
+            
+            print(f"✅ Sent notification to {len(tokens)} tokens. Success: {response.success_count}, Failed: {response.failure_count}")
+            
+            result = {
+                "success_count": response.success_count,
+                "failure_count": response.failure_count,
+                "total_tokens": len(tokens),
+                "responses": []
+            }
+            
+            for idx, resp in enumerate(response.responses):
+                token_result = {
+                    "token_index": idx,
+                    "success": resp.success
+                }
+                if not resp.success:
+                    token_result["error"] = str(resp.exception)
+                result["responses"].append(token_result)
+            
+            return result
+            
         except Exception as e:
-            print(f"Error sending notification: {e}")
-            return {"error": str(e)}
+            print(f"❌ Error sending notification: {e}")
+            return {
+                "error": str(e),
+                "success_count": 0,
+                "failure_count": len(tokens),
+                "total_tokens": len(tokens)
+            }
     
     async def send_manga_notification(
         self, 
@@ -117,5 +141,7 @@ class NotificationService:
             "message": f"Notification sent to {len(all_tokens)} tokens",
             "subscribers_count": len(subscribers),
             "tokens_count": len(all_tokens),
+            "success_count": result.get("success_count", 0),
+            "failure_count": result.get("failure_count", 0),
             "fcm_response": result
         }

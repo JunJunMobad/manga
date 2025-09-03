@@ -13,5 +13,3 @@ services:
         value: false
       - key: FIREBASE_SERVICE_ACCOUNT_KEY
         sync: false
-      - key: FCM_SERVER_KEY
-        sync: false
