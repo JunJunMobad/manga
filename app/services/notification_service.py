@@ -35,56 +35,93 @@ class NotificationService:
             Response from FCM service
         """
         try:
-            notification = messaging.Notification(
-                title=title,
-                body=body
-            )
+            print(f"🔔 Preparing to send notification to {len(tokens)} tokens")
+            print(f"📱 Title: {title}, Body: {body}")
             
-            android_config = messaging.AndroidConfig(
-                notification=messaging.AndroidNotification(
-                    sound="default"
-                )
-            )
-            
-            apns_config = messaging.APNSConfig(
-                payload=messaging.APNSPayload(
-                    aps=messaging.Aps(sound="default")
-                )
-            )
-            
-            string_data = {}
-            if data:
-                string_data = {k: str(v) for k, v in data.items()}
-            
-            message = messaging.MulticastMessage(
-                notification=notification,
-                data=string_data,
-                tokens=tokens,
-                android=android_config,
-                apns=apns_config
-            )
-            
-            response = messaging.send_multicast(message)
-            
-            print(f"✅ Sent notification to {len(tokens)} tokens. Success: {response.success_count}, Failed: {response.failure_count}")
-            
-            result = {
-                "success_count": response.success_count,
-                "failure_count": response.failure_count,
-                "total_tokens": len(tokens),
-                "responses": []
-            }
-            
-            for idx, resp in enumerate(response.responses):
-                token_result = {
-                    "token_index": idx,
-                    "success": resp.success
+            if not tokens or len(tokens) == 0:
+                return {
+                    "error": "No tokens provided",
+                    "success_count": 0,
+                    "failure_count": 0,
+                    "total_tokens": 0
                 }
-                if not resp.success:
-                    token_result["error"] = str(resp.exception)
-                result["responses"].append(token_result)
             
-            return result
+            valid_tokens = [token for token in tokens if token and isinstance(token, str) and token.strip()]
+            if len(valid_tokens) != len(tokens):
+                print(f"⚠️ Filtered out {len(tokens) - len(valid_tokens)} invalid tokens")
+            
+            if not valid_tokens:
+                return {
+                    "error": "No valid tokens after filtering",
+                    "success_count": 0,
+                    "failure_count": len(tokens),
+                    "total_tokens": len(tokens)
+                }
+            
+            results = []
+            success_count = 0
+            failure_count = 0
+            
+            for i, token in enumerate(valid_tokens):
+                try:
+                    message = messaging.Message(
+                        notification=messaging.Notification(
+                            title=title,
+                            body=body
+                        ),
+                        data={k: str(v) for k, v in (data or {}).items()},
+                        token=token,
+                        android=messaging.AndroidConfig(
+                            notification=messaging.AndroidNotification(sound="default")
+                        ),
+                        apns=messaging.APNSConfig(
+                            payload=messaging.APNSPayload(aps=messaging.Aps(sound="default"))
+                        )
+                    )
+                    
+                    message_id = messaging.send(message)
+                    print(f"✅ Token {i+1}/{len(valid_tokens)}: Success - {message_id}")
+                    
+                    results.append({
+                        "token_index": i,
+                        "success": True,
+                        "message_id": message_id
+                    })
+                    success_count += 1
+                    
+                except Exception as token_error:
+                    error_msg = str(token_error)
+                    print(f"❌ Token {i+1}/{len(valid_tokens)}: Failed - {error_msg}")
+                    print(f"🔍 Token details: {token[:20]}...{token[-10:]} (length: {len(token)})")
+                    
+                    if "APNS" in error_msg:
+                        print("💡 This appears to be an iOS token. Possible issues:")
+                        print("   - Bundle ID mismatch (app vs Firebase Console)")
+                        print("   - Missing Push Notifications capability in Xcode")
+                        print("   - App ID not configured in Apple Developer Console")
+                        print("   - APNs authentication key issues")
+                        print("   - Development vs Production environment mismatch")
+                    elif "Web Push" in error_msg:
+                        print("💡 This appears to be a web token. Check Web Push certificates.")
+                    elif "not found" in error_msg or "invalid" in error_msg:
+                        print("💡 Token may be expired, invalid, or from wrong project.")                                                        
+                    results.append({
+                        "token_index": i,
+                        "success": False,
+                        "error": error_msg,
+                        "token_preview": f"{token[:20]}...{token[-10:]}"
+                    })
+                    failure_count += 1
+            
+            print(f"📊 Notification results: {success_count} success, {failure_count} failed out of {len(valid_tokens)} tokens")
+            
+            return {
+                "success_count": success_count,
+                "failure_count": failure_count,
+                "total_tokens": len(tokens),
+                "valid_tokens": len(valid_tokens),
+                "responses": results
+            }
             
         except Exception as e:
             print(f"❌ Error sending notification: {e}")
