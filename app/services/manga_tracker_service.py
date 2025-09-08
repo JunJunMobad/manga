@@ -13,7 +13,7 @@ import requests
 
 
 class MangaTrackerService:
-    """Service for tracking manga chapters and managing notifications"""
+    """Tracks manga chapters and handles notification scheduling"""
     
     def __init__(self):
         self.firestore_service = FirestoreService()
@@ -46,7 +46,7 @@ class MangaTrackerService:
             
             for i, manga_data in enumerate(tracked_manga):
                 try:
-                    manga_id = manga_data["manga_id"]
+                    manga_hid = manga_data["manga_hid"]
                     
                     if i > 0:
                         import random
@@ -54,15 +54,15 @@ class MangaTrackerService:
                         print(f"⏳ Waiting {delay:.1f} seconds before next API call...")
                         await asyncio.sleep(delay)
                     
-                    new_chapters = await self._check_manga_chapters(manga_id, manga_data)
+                    new_chapters = await self._check_manga_chapters(manga_hid, manga_data)
                     
                     if new_chapters:
                         results["manga_with_new_chapters"] += 1
                         results["total_new_chapters"] += len(new_chapters)
-                        print(f"📖 {manga_id}: Found {len(new_chapters)} new chapters")
+                        print(f"📖 {manga_hid}: Found {len(new_chapters)} new chapters")
                     
                 except Exception as e:
-                    error_msg = f"Error checking manga {manga_data.get('manga_id', 'unknown')}: {str(e)}"
+                    error_msg = f"Error checking manga {manga_data.get('manga_hid', 'unknown')}: {str(e)}"
                     print(f"❌ {error_msg}")
                     results["errors"].append(error_msg)
             
@@ -81,17 +81,17 @@ class MangaTrackerService:
         try:
             subscription_docs = self.db.collection('subscriptions').stream()
             
-            manga_ids = set()
+            manga_hids = set()
             for doc in subscription_docs:
                 data = doc.to_dict()
-                user_mangas = data.get('mangas', [])
-                manga_ids.update(user_mangas)
+                user_hids = data.get('manga_hids', [])
+                manga_hids.update(user_hids)
             
-            print(f"📚 Found {len(manga_ids)} unique manga from user subscriptions")
+            print(f"📚 Found {len(manga_hids)} unique manga from user subscriptions")
             
             tracked_manga = []
-            for manga_id in manga_ids:
-                tracking_data = await self._get_or_create_tracking_data(manga_id)
+            for manga_hid in manga_hids:
+                tracking_data = await self._get_or_create_tracking_data(manga_hid)
                 if tracking_data:
                     tracked_manga.append(tracking_data)
             
@@ -101,47 +101,47 @@ class MangaTrackerService:
             print(f"❌ Error getting tracked manga: {e}")
             return []
     
-    async def _get_or_create_tracking_data(self, manga_id: str) -> Dict[str, Any]:
+    async def _get_or_create_tracking_data(self, manga_hid: str) -> Dict[str, Any]:
         """Get existing tracking data or create new one"""
         try:
-            doc_ref = self.db.collection('manga_trackings').document(manga_id)
+            doc_ref = self.db.collection('manga_trackings').document(manga_hid)
             doc = doc_ref.get()
             
             if doc.exists:
                 data = doc.to_dict()
-                data['manga_id'] = manga_id
+                data['manga_hid'] = manga_hid
                 return data
             else:
-                print(f"🆕 Creating new tracking for manga {manga_id}")
-                await self.initialize_manga_tracking(manga_id)
+                print(f"🆕 Creating new tracking for manga {manga_hid}")
+                await self.initialize_manga_tracking(manga_hid)
                 
                 doc = doc_ref.get()
                 if doc.exists:
                     data = doc.to_dict()
-                    data['manga_id'] = manga_id
+                    data['manga_hid'] = manga_hid
                     return data
-            
+                
             return None
             
         except Exception as e:
-            print(f"❌ Error getting tracking data for {manga_id}: {e}")
+            print(f"❌ Error getting tracking data for {manga_hid}: {e}")
             return None
     
-    async def _check_manga_chapters(self, manga_id: str, manga_data: Dict[str, Any]) -> List[Dict[str, Any]]:
+    async def _check_manga_chapters(self, manga_hid: str, manga_data: Dict[str, Any]) -> List[Dict[str, Any]]:
         """
         Check a specific manga for new chapters
         
         Args:
-            manga_id: Manga identifier
+            manga_hid: Manga hid identifier
             manga_data: Current tracking data for the manga
             
         Returns:
             List of new chapters found
         """
         try:
-            chapters = await self._fetch_manga_chapters(manga_id)
+            chapters = await self._fetch_manga_chapters(manga_hid)
             if not chapters:
-                print(f"⚠️  API unavailable for {manga_id} (likely Cloudflare protection)")
+                print(f"⚠️  API unavailable for {manga_hid} (likely Cloudflare protection)")
                 print(f"📝 Keeping existing tracking data and will retry later")
                 return []
             
@@ -172,38 +172,38 @@ class MangaTrackerService:
                         latest_created_at = chapter_created_at
             
             if new_chapters:
-                await self._update_manga_tracking(manga_id, latest_created_at)
-                await self._store_pending_notifications(manga_id, new_chapters)
+                await self._update_manga_tracking(manga_hid, latest_created_at)
+                await self._store_pending_notifications(manga_hid, new_chapters)
             
             return new_chapters
             
         except Exception as e:
-            print(f"❌ Error checking chapters for {manga_id}: {e}")
+            print(f"❌ Error checking chapters for {manga_hid}: {e}")
             return []
     
-    async def _fetch_manga_chapters(self, manga_id: str) -> List[Dict[str, Any]]:
+    async def _fetch_manga_chapters(self, manga_hid: str) -> List[Dict[str, Any]]:
         """Fetch chapters from the manga API using ZenRows bypass"""
-        print(f"🔍 Fetching chapters for {manga_id}")
+        print(f"🔍 Fetching chapters for {manga_hid}")
         
         try:
             print("🌐 Attempting ZenRows Cloudflare bypass...")
-            data = await zenrows_service.fetch_manga_chapters(manga_id)
+            data = await zenrows_service.fetch_manga_chapters(manga_hid)
             
             if data and 'chapters' in data:
                 chapters = data.get('chapters', [])
-                print(f"✅ Successfully fetched {len(chapters)} chapters for {manga_id} via ZenRows")
+                print(f"✅ Successfully fetched {len(chapters)} chapters for {manga_hid} via ZenRows")
                 return chapters
             
             print("🔄 ZenRows failed, trying direct request...")
-            return await self._fetch_direct(manga_id)
+            return await self._fetch_direct(manga_hid)
                         
         except Exception as e:
-            print(f"❌ Error fetching chapters for {manga_id}: {e}")
+            print(f"❌ Error fetching chapters for {manga_hid}: {e}")
             return []
     
-    async def _fetch_direct(self, manga_id: str) -> List[Dict[str, Any]]:
-        """Direct fetch as fallback (will likely fail due to Cloudflare)"""
-        url = f"{self.api_base_url}/{manga_id}/chapters?date-order=2&lang=en"
+    async def _fetch_direct(self, manga_hid: str) -> List[Dict[str, Any]]:
+        """Direct fetch as fallback"""
+        url = f"{self.api_base_url}/{manga_hid}/chapters?date-order=2&lang=en"
         
         try:
             import http.client
@@ -271,10 +271,10 @@ class MangaTrackerService:
             print(f"❌ Error fetching manga title for {manga_id}: {e}")
             return f"Manga {manga_id}"
     
-    async def _update_manga_tracking(self, manga_id: str, latest_created_at: str):
+    async def _update_manga_tracking(self, manga_hid: str, latest_created_at: str):
         """Update manga tracking data"""
         try:
-            doc_ref = self.db.collection('manga_trackings').document(manga_id)
+            doc_ref = self.db.collection('manga_trackings').document(manga_hid)
             doc_ref.update({
                 'last_created_at': latest_created_at,
                 'last_checked_at': datetime.utcnow().isoformat() + 'Z',
@@ -282,12 +282,12 @@ class MangaTrackerService:
             })
             
         except Exception as e:
-            print(f"❌ Error updating tracking for {manga_id}: {e}")
+            print(f"❌ Error updating tracking for {manga_hid}: {e}")
     
-    async def _store_pending_notifications(self, manga_id: str, new_chapters: List[Dict[str, Any]]):
+    async def _store_pending_notifications(self, manga_hid: str, new_chapters: List[Dict[str, Any]]):
         """Store new chapters for pending notifications"""
         try:
-            doc_ref = self.db.collection('pending_notifications').document(manga_id)
+            doc_ref = self.db.collection('pending_notifications').document(manga_hid)
             doc = doc_ref.get()
             
             if doc.exists:
@@ -305,14 +305,14 @@ class MangaTrackerService:
                 })
             else:
                 doc_ref.set({
-                    'manga_id': manga_id,
+                    'manga_hid': manga_hid,
                     'chapters': new_chapters,
                     'created_at': firestore.SERVER_TIMESTAMP,
                     'updated_at': firestore.SERVER_TIMESTAMP
                 })
                 
         except Exception as e:
-            print(f"❌ Error storing pending notifications for {manga_id}: {e}")
+            print(f"❌ Error storing pending notifications for {manga_hid}: {e}")
     
     async def send_scheduled_notifications(self, day: str = None) -> Dict[str, Any]:
         """
@@ -343,21 +343,21 @@ class MangaTrackerService:
             }
             
             for doc in pending_docs:
-                manga_id = doc.id
+                manga_hid = doc.id
                 data = doc.to_dict()
                 chapters = data.get('chapters', [])
                 
                 if not chapters:
                     continue
                 
-                manga_result = await self._send_manga_notifications(manga_id, chapters)
+                manga_result = await self._send_manga_notifications(manga_hid, chapters)
                 results["manga_notifications"].append(manga_result)
                 results["total_manga_processed"] += 1
                 results["total_notifications_sent"] += manga_result["subscribers_count"]
                 results["total_success"] += manga_result["success_count"]
                 results["total_failures"] += manga_result["failure_count"]
                 
-                await self._mark_chapters_notified(manga_id, chapters)
+                await self._mark_chapters_notified(manga_hid, chapters)
                 
                 doc.reference.delete()
             
@@ -371,14 +371,14 @@ class MangaTrackerService:
             print(f"❌ Error in notification batch: {e}")
             raise e
     
-    async def _send_manga_notifications(self, manga_id: str, chapters: List[Dict[str, Any]]) -> Dict[str, Any]:
+    async def _send_manga_notifications(self, manga_hid: str, chapters: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Send notifications for a specific manga's chapters"""
         try:
-            subscribers = await self.firestore_service.get_manga_subscribers(manga_id)
+            subscribers = await self.firestore_service.get_manga_subscribers(manga_hid)
             
             if not subscribers:
                 return {
-                    "manga_id": manga_id,
+                    "manga_hid": manga_hid,
                     "chapters_sent": [ch.get('chap') for ch in chapters],
                     "subscribers_count": 0,
                     "success_count": 0,
@@ -387,7 +387,7 @@ class MangaTrackerService:
             
             chapter_list = ", ".join([f"Ch. {ch.get('chap')}" for ch in chapters])
             
-            manga_title = await self._get_manga_title(manga_id)
+            manga_title = await self.firestore_service.get_manga_title_by_hid(manga_hid)
             
             title = "📖 New Chapter 📖"
             
@@ -397,12 +397,12 @@ class MangaTrackerService:
                 body = f"New chapters have arrived: • {manga_title} • Chapters {chapter_list}"
             
             result = await self.notification_service.send_manga_notification(
-                manga_id=manga_id,
+                manga_id=manga_hid,
                 title=title,
                 body=body,
                 data={
                     "type": "new_chapters",
-                    "manga_id": manga_id,
+                    "manga_hid": manga_hid,
                     "manga_title": manga_title,
                     "chapter_count": str(len(chapters)),
                     "chapters": chapter_list,
@@ -412,7 +412,7 @@ class MangaTrackerService:
             )
             
             return {
-                "manga_id": manga_id,
+                "manga_hid": manga_hid,
                 "chapters_sent": [ch.get('chap') for ch in chapters],
                 "subscribers_count": len(subscribers),
                 "success_count": result.get("success_count", 0),
@@ -420,9 +420,9 @@ class MangaTrackerService:
             }
             
         except Exception as e:
-            print(f"❌ Error sending notifications for {manga_id}: {e}")
+            print(f"❌ Error sending notifications for {manga_hid}: {e}")
             return {
-                "manga_id": manga_id,
+                "manga_hid": manga_hid,
                 "chapters_sent": [ch.get('chap') for ch in chapters],
                 "subscribers_count": 0,
                 "success_count": 0,
@@ -430,19 +430,19 @@ class MangaTrackerService:
                 "error": str(e)
             }
     
-    async def _mark_chapters_notified(self, manga_id: str, chapters: List[Dict[str, Any]]):
+    async def _mark_chapters_notified(self, manga_hid: str, chapters: List[Dict[str, Any]]):
         """Mark chapters as already notified"""
         try:
             chapter_nums = [str(ch.get('chap')) for ch in chapters if ch.get('chap')]
             
-            doc_ref = self.db.collection('manga_trackings').document(manga_id)
+            doc_ref = self.db.collection('manga_trackings').document(manga_hid)
             doc_ref.update({
                 'already_notified_chapters': firestore.ArrayUnion(chapter_nums),
                 'updated_at': firestore.SERVER_TIMESTAMP
             })
             
         except Exception as e:
-            print(f"❌ Error marking chapters notified for {manga_id}: {e}")
+            print(f"❌ Error marking chapters notified for {manga_hid}: {e}")
     
     async def _log_notification_history(self, day: str, results: Dict[str, Any], duration: float):
         """Log notification batch to history"""
@@ -488,22 +488,22 @@ class MangaTrackerService:
         except Exception as e:
             print(f"❌ Error updating cron status: {e}")
     
-    async def initialize_manga_tracking(self, manga_id: str) -> bool:
+    async def initialize_manga_tracking(self, manga_hid: str) -> bool:
         """
         Initialize tracking for a new manga
         
         Args:
-            manga_id: Manga identifier
+            manga_hid: Manga hid identifier
             
         Returns:
             True if successful
         """
         try:
-            doc_ref = self.db.collection('manga_trackings').document(manga_id)
+            doc_ref = self.db.collection('manga_trackings').document(manga_hid)
             doc = doc_ref.get()
             
             if not doc.exists:
-                chapters = await self._fetch_manga_chapters(manga_id)
+                chapters = await self._fetch_manga_chapters(manga_hid)
                 
                 latest_created_at = None
                 existing_chapters = []
@@ -519,7 +519,7 @@ class MangaTrackerService:
                             existing_chapters.append(chapter_num)
                 
                 doc_ref.set({
-                    'manga_id': manga_id,
+                    'manga_hid': manga_hid,
                     'last_checked_at': datetime.utcnow().isoformat() + 'Z',
                     'last_created_at': latest_created_at,
                     'already_notified_chapters': existing_chapters,
@@ -528,7 +528,7 @@ class MangaTrackerService:
                     'updated_at': firestore.SERVER_TIMESTAMP
                 })
                 
-                print(f"✅ Initialized tracking for manga {manga_id}")
+                print(f"✅ Initialized tracking for manga {manga_hid}")
             else:
                 doc_ref.update({
                     'is_active': True,
@@ -538,6 +538,6 @@ class MangaTrackerService:
             return True
             
         except Exception as e:
-            print(f"❌ Error initializing manga tracking for {manga_id}: {e}")
+            print(f"❌ Error initializing manga tracking for {manga_hid}: {e}")
             return False
     

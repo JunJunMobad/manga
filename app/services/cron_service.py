@@ -10,7 +10,7 @@ import time as time_module
 
 
 class CronService:
-    """Service for managing scheduled background tasks"""
+    """Manages background job scheduling and execution"""
     
     def __init__(self):
         self.manga_tracker = None
@@ -191,10 +191,7 @@ class CronService:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
             
-            # Todo:
-            # - Remove old notification history
-            # - Clean up inactive manga tracking
-            # - etc.
+            # Weekly maintenance tasks would go here
             
             print("✅ Weekly cleanup completed")
             loop.close()

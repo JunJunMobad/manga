@@ -14,18 +14,7 @@ security = HTTPBearer()
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ) -> Dict[str, Any]:
-    """
-    FastAPI dependency to verify Firebase ID token and get current user
-    
-    Args:
-        credentials: HTTP Bearer token from Authorization header
-        
-    Returns:
-        Decoded Firebase token containing user information
-        
-    Raises:
-        HTTPException: 401 if token is invalid
-    """
+    """FastAPI dependency to verify Firebase ID token and get current user"""
     try:
         id_token = credentials.credentials
         

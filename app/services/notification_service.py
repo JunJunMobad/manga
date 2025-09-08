@@ -9,7 +9,7 @@ from app.services.firebase_service import FirestoreService
 
 
 class NotificationService:
-    """Service for sending FCM notifications"""
+    """Handles FCM push notifications to mobile devices"""
     
     def __init__(self):
         self.firestore_service = FirestoreService()
@@ -205,7 +205,6 @@ class NotificationService:
         notification_data = data or {}
         notification_data["manga_id"] = manga_id
         
-        # Use bulk notification method
         result = await self.send_bulk_notification(
             tokens=all_tokens,
             title=title,
