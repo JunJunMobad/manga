@@ -7,6 +7,7 @@ from typing import Dict, Any
 from app.schemas.requests import MangaSubscriptionRequest
 from app.schemas.responses import MangaSubscriptionResponse, UserInfoResponse
 from app.services.firebase_service import FirestoreService
+from app.services.manga_tracker_service import MangaTrackerService
 from app.utils.auth import get_current_user, get_user_id
 
 
@@ -29,6 +30,7 @@ async def subscribe_to_manga(
         Success response with updated subscriptions or error if already subscribed
     """
     firestore_service = FirestoreService()
+    manga_tracker = MangaTrackerService()
     
     result = await firestore_service.subscribe_to_manga(user_id, request.manga_id)
     

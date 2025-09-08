@@ -1,24 +1,28 @@
 """
 FastAPI backend for mobile app with Firebase Auth and Firestore
 """
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import uvicorn
-
-from app.config import settings
-from app.routes import notifications, manga
+from app.routes import notifications, manga, admin
 from app.services.firebase_service import initialize_firebase
+from app.services.cron_service import cron_service
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Initialize Firebase on startup"""
+    """Initialize Firebase and start cron jobs on startup"""
     print("🚀 Starting Manga Notification API...")
     initialize_firebase()
+    
+    cron_service.start_scheduler()
+    
     print("✅ Application startup completed successfully!")
     yield
+    
     print("🛑 Application shutting down...")
+    cron_service.stop_scheduler()
 
 
 app = FastAPI(
@@ -38,6 +42,7 @@ app.add_middleware(
 
 app.include_router(notifications.router, prefix="/notifications", tags=["notifications"])
 app.include_router(manga.router, prefix="/manga", tags=["manga"])
+app.include_router(admin.router, prefix="/admin", tags=["admin"])
 
 
 @app.get("/")

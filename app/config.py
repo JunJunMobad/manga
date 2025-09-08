@@ -3,13 +3,16 @@ Configuration settings for the FastAPI application
 """
 from pydantic_settings import BaseSettings
 import json
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     firebase_service_account_key: str
+    
+    # ZenRows API configuration for Cloudflare bypass
+    zenrows_api_key: Optional[str] = None
     
     environment: str = "development"
     debug: bool = True

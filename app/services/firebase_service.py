@@ -5,7 +5,6 @@ import firebase_admin
 from firebase_admin import credentials, auth, firestore
 from google.cloud.firestore_v1 import Client as FirestoreClient
 from typing import Optional, Dict, Any
-import json
 
 from app.config import settings
 

@@ -15,6 +15,57 @@ class NotificationService:
         self.firestore_service = FirestoreService()
         print("✅ FCM notification service initialized with Firebase Admin SDK")
     
+    async def _send_fcm_message_to_single_token(
+        self, 
+        token: str, 
+        title: str, 
+        body: str, 
+        data: Dict[str, Any] = None
+    ) -> Dict[str, Any]:
+        """Send FCM notification to a single token"""
+        try:
+            # Create FCM message
+            message = messaging.Message(
+                notification=messaging.Notification(
+                    title=title,
+                    body=body
+                ),
+                data={k: str(v) for k, v in (data or {}).items()},
+                token=token,
+                android=messaging.AndroidConfig(
+                    notification=messaging.AndroidNotification(sound="default")
+                ),
+                apns=messaging.APNSConfig(
+                    payload=messaging.APNSPayload(aps=messaging.Aps(sound="default"))
+                )
+            )
+            
+            # Send message using Firebase Admin SDK
+            message_id = messaging.send(message)
+            
+            return {
+                "success": True,
+                "message_id": message_id,
+                "token": token
+            }
+            
+        except Exception as e:
+            return {
+                "success": False,
+                "error": str(e),
+                "token": token
+            }
+    
+    async def send_bulk_notification(
+        self, 
+        tokens: List[str], 
+        title: str, 
+        body: str, 
+        data: Dict[str, Any] = None
+    ) -> Dict[str, Any]:
+        """Send notifications to multiple FCM tokens"""
+        return await self.send_notification_to_tokens(tokens, title, body, data)
+    
     async def send_notification_to_tokens(
         self, 
         tokens: List[str], 
@@ -63,37 +114,23 @@ class NotificationService:
             failure_count = 0
             
             for i, token in enumerate(valid_tokens):
-                try:
-                    message = messaging.Message(
-                        notification=messaging.Notification(
-                            title=title,
-                            body=body
-                        ),
-                        data={k: str(v) for k, v in (data or {}).items()},
-                        token=token,
-                        android=messaging.AndroidConfig(
-                            notification=messaging.AndroidNotification(sound="default")
-                        ),
-                        apns=messaging.APNSConfig(
-                            payload=messaging.APNSPayload(aps=messaging.Aps(sound="default"))
-                        )
-                    )
-                    
-                    message_id = messaging.send(message)
-                    print(f"✅ Token {i+1}/{len(valid_tokens)}: Success - {message_id}")
-                    
+                # Send to individual token
+                result = await self._send_fcm_message_to_single_token(token, title, body, data)
+                
+                if result["success"]:
+                    print(f"✅ Token {i+1}/{len(valid_tokens)}: Success - {result['message_id']}")
                     results.append({
                         "token_index": i,
                         "success": True,
-                        "message_id": message_id
+                        "message_id": result["message_id"]
                     })
                     success_count += 1
-                    
-                except Exception as token_error:
-                    error_msg = str(token_error)
+                else:
+                    error_msg = result["error"]
                     print(f"❌ Token {i+1}/{len(valid_tokens)}: Failed - {error_msg}")
                     print(f"🔍 Token details: {token[:20]}...{token[-10:]} (length: {len(token)})")
                     
+                    # Enhanced error diagnostics
                     if "APNS" in error_msg:
                         print("💡 This appears to be an iOS token. Possible issues:")
                         print("   - Bundle ID mismatch (app vs Firebase Console)")
@@ -104,7 +141,8 @@ class NotificationService:
                     elif "Web Push" in error_msg:
                         print("💡 This appears to be a web token. Check Web Push certificates.")
                     elif "not found" in error_msg or "invalid" in error_msg:
-                        print("💡 Token may be expired, invalid, or from wrong project.")                                                        
+                        print("💡 Token may be expired, invalid, or from wrong project.")
+                    
                     results.append({
                         "token_index": i,
                         "success": False,
@@ -167,7 +205,8 @@ class NotificationService:
         notification_data = data or {}
         notification_data["manga_id"] = manga_id
         
-        result = await self.send_notification_to_tokens(
+        # Use bulk notification method
+        result = await self.send_bulk_notification(
             tokens=all_tokens,
             title=title,
             body=body,

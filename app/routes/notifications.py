@@ -101,6 +101,7 @@ async def send_test_notification(
     """
     notification_service = NotificationService()
     
+    # This is the REFERENCE implementation that works correctly
     result = await notification_service.send_notification_to_tokens(
         tokens=request.tokens,
         title=request.title,
