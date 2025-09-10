@@ -227,11 +227,11 @@ class MangaTrackerService:
                 response_data = response.read().decode('utf-8')
                 data = json.loads(response_data)
                 chapters = data.get('chapters', [])
-                print(f"✅ Direct request successful! Fetched {len(chapters)} chapters for {manga_id}")
+                print(f"✅ Direct request successful! Fetched {len(chapters)} chapters for {manga_hid}")
                 conn.close()
                 return chapters
             else:
-                print(f"❌ Direct request failed for {manga_id}: {response.status}")
+                print(f"❌ Direct request failed for {manga_hid}: {response.status}")
                 
                 if response.status == 403:
                     print("💡 403 Forbidden - Cloudflare protection active")
@@ -385,16 +385,28 @@ class MangaTrackerService:
                     "failure_count": 0
                 }
             
-            chapter_list = ", ".join([f"Ch. {ch.get('chap')}" for ch in chapters])
+            chapter_titles = []
+            for ch in chapters:
+                chapter_title = ch.get('title', '').strip()
+                if chapter_title:
+                    chapter_titles.append(chapter_title)
             
             manga_title = await self.firestore_service.get_manga_title_by_hid(manga_hid)
             
             title = "📖 New Chapter 📖"
             
             if len(chapters) == 1:
-                body = f"A new chapter has arrived: • {manga_title} •"
+                if chapter_titles:
+                    body = f"A new chapter has arrived: • {manga_title} • {chapter_titles[0]}"
+                else:
+                    body = f"A new chapter has arrived: • {manga_title} •"
             else:
-                body = f"New chapters have arrived: • {manga_title} • Chapters {chapter_list}"
+                if chapter_titles:
+                    chapter_list = " • ".join(chapter_titles)
+                    body = f"New chapters have arrived: • {manga_title} • {chapter_list}"
+                else:
+                    chapter_numbers = ", ".join([f"Ch. {ch.get('chap')}" for ch in chapters])
+                    body = f"New chapters have arrived: • {manga_title} • Chapters {chapter_numbers}"
             
             result = await self.notification_service.send_manga_notification(
                 manga_id=manga_hid,
