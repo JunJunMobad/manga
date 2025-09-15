@@ -192,7 +192,14 @@ class NotificationService:
         subscribers = await self.firestore_service.get_manga_subscribers(manga_id)
         
         if not subscribers:
-            return {"message": "No subscribers found for this manga", "sent_count": 0}
+            return {
+                "message": "No subscribers found for this manga", 
+                "subscribers_count": 0,
+                "tokens_count": 0,
+                "success_count": 0,
+                "failure_count": 0,
+                "fcm_response": {}
+            }
         
         all_tokens = []
         for user_id in subscribers:
@@ -200,7 +207,14 @@ class NotificationService:
             all_tokens.extend(tokens)
         
         if not all_tokens:
-            return {"message": "No FCM tokens found for subscribers", "sent_count": 0}
+            return {
+                "message": "No FCM tokens found for subscribers", 
+                "subscribers_count": len(subscribers),
+                "tokens_count": 0,
+                "success_count": 0,
+                "failure_count": 0,
+                "fcm_response": {}
+            }
         
         notification_data = data or {}
         notification_data["manga_id"] = manga_id

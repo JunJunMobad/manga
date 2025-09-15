@@ -2,11 +2,11 @@
 Cron job service for scheduling background tasks
 """
 import asyncio
+import time
 from datetime import datetime
 from typing import Dict, Any
 import schedule
 import threading
-import time as time_module
 
 
 class CronService:
@@ -73,10 +73,10 @@ class CronService:
         while self.is_running:
             try:
                 schedule.run_pending()
-                time_module.sleep(60)
+                time.sleep(60)
             except Exception as e:
                 print(f"❌ Scheduler error: {e}")
-                time_module.sleep(60)
+                time.sleep(60)
     
     def _run_initial_chapter_check(self):
         """Run initial chapter check after startup - clears all data first"""
