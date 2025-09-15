@@ -171,6 +171,8 @@ class MangaTrackerService:
                     if not latest_created_at or chapter_created_at > latest_created_at:
                         latest_created_at = chapter_created_at
             
+            await self._update_last_checked(manga_hid)
+            
             if new_chapters:
                 await self._update_manga_tracking(manga_hid, latest_created_at)
                 await self._store_pending_notifications(manga_hid, new_chapters)
@@ -271,13 +273,24 @@ class MangaTrackerService:
             print(f"❌ Error fetching manga title for {manga_id}: {e}")
             return f"Manga {manga_id}"
     
+    async def _update_last_checked(self, manga_hid: str):
+        """Update last_checked_at timestamp for manga tracking"""
+        try:
+            doc_ref = self.db.collection('manga_trackings').document(manga_hid)
+            doc_ref.update({
+                'last_checked_at': datetime.utcnow().isoformat() + 'Z',
+                'updated_at': firestore.SERVER_TIMESTAMP
+            })
+            
+        except Exception as e:
+            print(f"❌ Error updating last_checked for {manga_hid}: {e}")
+    
     async def _update_manga_tracking(self, manga_hid: str, latest_created_at: str):
-        """Update manga tracking data"""
+        """Update manga tracking data with new chapter info"""
         try:
             doc_ref = self.db.collection('manga_trackings').document(manga_hid)
             doc_ref.update({
                 'last_created_at': latest_created_at,
-                'last_checked_at': datetime.utcnow().isoformat() + 'Z',
                 'updated_at': firestore.SERVER_TIMESTAMP
             })
             
@@ -287,6 +300,8 @@ class MangaTrackerService:
     async def _store_pending_notifications(self, manga_hid: str, new_chapters: List[Dict[str, Any]]):
         """Store new chapters for pending notifications"""
         try:
+            manga_title = await self.firestore_service.get_manga_title_by_hid(manga_hid)
+            
             doc_ref = self.db.collection('pending_notifications').document(manga_hid)
             doc = doc_ref.get()
             
@@ -301,11 +316,13 @@ class MangaTrackerService:
                 
                 doc_ref.update({
                     'chapters': existing_chapters,
+                    'manga_title': manga_title,
                     'updated_at': firestore.SERVER_TIMESTAMP
                 })
             else:
                 doc_ref.set({
                     'manga_hid': manga_hid,
+                    'manga_title': manga_title,
                     'chapters': new_chapters,
                     'created_at': firestore.SERVER_TIMESTAMP,
                     'updated_at': firestore.SERVER_TIMESTAMP
@@ -395,6 +412,12 @@ class MangaTrackerService:
             
             title = "📖 New Chapter 📖"
             
+            if chapter_titles:
+                chapter_list = " • ".join(chapter_titles)
+            else:
+                chapter_numbers = [f"Ch. {ch.get('chap')}" for ch in chapters if ch.get('chap')]
+                chapter_list = ", ".join(chapter_numbers)
+            
             if len(chapters) == 1:
                 if chapter_titles:
                     body = f"A new chapter has arrived: • {manga_title} • {chapter_titles[0]}"
@@ -402,7 +425,6 @@ class MangaTrackerService:
                     body = f"A new chapter has arrived: • {manga_title} •"
             else:
                 if chapter_titles:
-                    chapter_list = " • ".join(chapter_titles)
                     body = f"New chapters have arrived: • {manga_title} • {chapter_list}"
                 else:
                     chapter_numbers = ", ".join([f"Ch. {ch.get('chap')}" for ch in chapters])
