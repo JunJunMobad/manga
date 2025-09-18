@@ -256,7 +256,7 @@ class MangaTrackerService:
             params = {
                 'url': manga_url,
                 'apikey': zenrows_service.api_key,
-                'js_render': 'false',
+                'js_render': 'true',
                 'premium_proxy': 'true',
             }
             

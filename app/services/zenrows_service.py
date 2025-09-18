@@ -35,7 +35,7 @@ class ZenRowsService:
             params = {
                 'url': target_url,
                 'apikey': self.api_key,
-                'js_render': 'false',
+                'js_render': 'true',
                 'premium_proxy': 'true',
             }
             
@@ -99,7 +99,7 @@ class ZenRowsService:
             params = {
                 'url': target_url,
                 'apikey': self.api_key,
-                'js_render': 'false',
+                'js_render': 'true',
                 'premium_proxy': 'true',
             }
             
