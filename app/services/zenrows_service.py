@@ -37,6 +37,8 @@ class ZenRowsService:
                 'apikey': self.api_key,
                 'js_render': 'true',
                 'premium_proxy': 'true',
+                'proxy_country': 'us',
+                'wait': 100000
             }
             
             response = requests.get(self.base_url, params=params, timeout=30)
@@ -101,6 +103,8 @@ class ZenRowsService:
                 'apikey': self.api_key,
                 'js_render': 'true',
                 'premium_proxy': 'true',
+                'proxy_country': 'us',
+                'wait': 100000
             }
             
             response = requests.get(self.base_url, params=params, timeout=30)

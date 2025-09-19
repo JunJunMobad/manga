@@ -258,6 +258,8 @@ class MangaTrackerService:
                 'apikey': zenrows_service.api_key,
                 'js_render': 'true',
                 'premium_proxy': 'true',
+                'proxy_country': 'us',
+                'wait': 100000
             }
             
             if zenrows_service.api_key:
