@@ -1,6 +1,7 @@
 """
 FastAPI backend for mobile app with Firebase Auth and Firestore
 """
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
@@ -15,12 +16,12 @@ async def lifespan(app: FastAPI):
     """Initialize Firebase and start cron jobs on startup"""
     print("🚀 Starting Manga Notification API...")
     initialize_firebase()
-    
+
     cron_service.start_scheduler()
-    
+
     print("✅ Application startup completed successfully!")
     yield
-    
+
     print("🛑 Application shutting down...")
     cron_service.stop_scheduler()
 
@@ -29,7 +30,7 @@ app = FastAPI(
     title="Manga Notification API",
     description="FastAPI backend for manga subscription notifications with Firebase Auth",
     version="1.0.0",
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -40,7 +41,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(notifications.router, prefix="/notifications", tags=["notifications"])
+app.include_router(
+    notifications.router, prefix="/notifications", tags=["notifications"]
+)
 app.include_router(manga.router, prefix="/manga", tags=["manga"])
 app.include_router(admin.router, prefix="/admin", tags=["admin"])
 
@@ -58,9 +61,4 @@ async def health_check():
 
 
 if __name__ == "__main__":
-    uvicorn.run(
-        "main:app",
-        host="0.0.0.0",
-        port=8000,
-        reload=True
-    )
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

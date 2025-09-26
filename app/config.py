@@ -1,6 +1,7 @@
 """
 Configuration settings for the FastAPI application
 """
+
 from pydantic_settings import BaseSettings
 import json
 from typing import Dict, Any, Optional
@@ -8,20 +9,20 @@ from typing import Dict, Any, Optional
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
-    
+
     firebase_service_account_key: str
-    
+
     # ZenRows API configuration for Cloudflare bypass
     zenrows_api_key: Optional[str] = None
-    
+
     environment: str = "development"
     debug: bool = True
-    
+
     class Config:
         env_file = ".env"
         case_sensitive = False
         extra = "ignore"
-    
+
     def get_firebase_credentials(self) -> Dict[str, Any]:
         """Parse Firebase service account key from JSON string"""
         try:

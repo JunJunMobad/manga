@@ -1,6 +1,7 @@
 """
 Authentication utilities and dependencies for FastAPI
 """
+
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import Dict, Any
@@ -12,14 +13,14 @@ security = HTTPBearer()
 
 
 async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security)
+    credentials: HTTPAuthorizationCredentials = Depends(security),
 ) -> Dict[str, Any]:
     """FastAPI dependency to verify Firebase ID token and get current user"""
     try:
         id_token = credentials.credentials
-        
+
         decoded_token = await verify_firebase_token(id_token)
-        
+
         return decoded_token
     except ValueError as e:
         raise HTTPException(
@@ -38,10 +39,10 @@ async def get_current_user(
 def get_user_id(current_user: Dict[str, Any] = Depends(get_current_user)) -> str:
     """
     Extract user ID from decoded Firebase token
-    
+
     Args:
         current_user: Decoded Firebase token
-        
+
     Returns:
         Firebase user ID (uid)
     """
